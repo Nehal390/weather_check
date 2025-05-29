@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Weather App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(120deg, #89f7fe 0%, #66a6ff 100%);
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 500px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      padding: 32px 24px;
+      text-align: center;
+    }
+    input, button {
+      padding: 10px;
+      margin: 8px 4px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 16px;
+    }
+    button {
+      background: #4f8cff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    #weatherDisplay img, .forecast-day img {
+      vertical-align: middle;
+      width: 60px;
+      height: 60px;
+    }
+    .forecast {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+      gap: 8px;
+    }
+    .forecast-day {
+      background: #e3f0ff;
+      border-radius: 10px;
+      padding: 12px 6px;
+      flex: 1;
+      min-width: 70px;
+    }
+    .forecast-day p {
+      margin: 2px 0;
+      font-size: 14px;
+    }
+    h2 {
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Weather App</h1>
+    <input type="text" id="cityInput" placeholder="Enter city" />
+    <input type="text" id="countryInput" placeholder="Enter country code (e.g., US)" />
+    <button id="searchButton">Search</button>
+    <div id="weatherDisplay"></div>
+    <div id="forecastDisplay"></div>
+  </div>
+  <script>
+    const apiKey = 'YOUR_API_KEY_HERE'; // <-- Replace with your OpenWeatherMap API key
+
+    document.getElementById('searchButton').onclick = async function() {
+      const city = document.getElementById('cityInput').value.trim();
+      const country = document.getElementById('countryInput').value.trim();
+      if (!city || !country) {
+        alert('Please enter both city and country code!');
+        return;
+      }
+
+      const currentUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city},${country}&units=metric&appid=${apiKey}`;
+      const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${city},${country}&units=metric&appid=${apiKey}`;
+
+      document.getElementById('weatherDisplay').innerHTML = 'Loading...';
+      document.getElementById('forecastDisplay').innerHTML = '';
+
+      try {
+        // Fetch current weather
+        const currentResponse = await fetch(currentUrl);
+        if (!currentResponse.ok) throw new Error('City not found!');
+        const currentData = await currentResponse.json();
+
+        // Fetch forecast
+        const forecastResponse = await fetch(forecastUrl);
+        if (!forecastResponse.ok) throw new Error('Forecast not found!');
+        const forecastData = await forecastResponse.json();
+
+        displayWeather(currentData);
+        displayForecast(forecastData);
+      } catch (err) {
+        document.getElementById('weatherDisplay').innerHTML = `<p style="color:red;">${err.message}</p>`;
+        document.getElementById('forecastDisplay').innerHTML = '';
+      }
+    };
+
+    function displayWeather(data) {
+      document.getElementById('weatherDisplay').innerHTML = `
+        <h2>${data.name}, ${data.sys.country}</h2>
+        <img src="<https://openweathermap.org/img/wn/${data.weather>[0].icon}@2x.png" alt="${data.weather[0].main}" />
+        <p style="font-size:22px;"><strong>${Math.round(data.main.temp)}°C</strong></p>
+        <p>Humidity: <strong>${data.main.humidity}%</strong></p>
+        <p>Condition: <strong>${capitalize(data.weather[0].description)}</strong></p>
+      `;
+    }
+
+    function displayForecast(data) {
+      // OpenWeatherMap's 5-day forecast gives data every 3 hours. We'll pick the forecast at 12:00 each day.
+      const forecastByDay = {};
+      data.list.forEach(item => {
+        const date = item.dt_txt.split(' ')[0];
+        const hour = item.dt_txt.split(' ')[1];
+        if (hour === "12:00:00") {
+          forecastByDay[date] = item;
+        }
+      });
+
+      // Get the next 5 days
+      const days = Object.keys(forecastByDay).slice(0, 5);
+
+      let html = '<div class="forecast">';
+      days.forEach(date => {
+        const item = forecastByDay[date];
+        // Precipitation probability is not always available; fallback to 0
+        const pop = item.pop !== undefined ? Math.round(item.pop * 100) : 0;
+        html += `
+          <div class="forecast-day">
+            <p><strong>${formatDate(date)}</strong></p>
+            <img src="<https://openweathermap.org/img/wn/${item.weather>[0].icon}@2x.png" alt="${item.weather[0].main}" />
+            <p>${Math.round(item.main.temp)}°C</p>
+            <p>💧 ${item.main.humidity}%</p>
+            <p>🌧️ ${pop}%</p>
+          </div>
+        `;
+      });
+      html += '</div>';
+      document.getElementById('forecastDisplay').innerHTML = html;
+    }
+
+    function formatDate(dateStr) {
+      const options = { weekday: 'short', month: 'short', day: 'numeric' };
+      return new Date(dateStr).toLocaleDateString(undefined, options);
+    }
+
+    function capitalize(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+  </script>
+</body>
+</html>
